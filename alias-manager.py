@@ -1,125 +1,149 @@
 #!/usr/bin/env python
 
-import ConfigParser
-import sys
-import os
-import optparse
+from __future__ import print_function
+
+from ConfigParser import SafeConfigParser
+from argparse import ArgumentParser
 import random
+import os.path
 
-#import MySQLdb
-import psycopg2
+from pprint import pprint
 
-# list
-# add
-# remove
-# disable
-# enable
+from aliasmanager import *
 
 DEFAULT_CONFIG = {
     'database': {
         'host': None,
-        'database': None,
+        'dbname': None,
         'table': None,
         'user': None,
         'password': None
         },
+    'add': {
+        'digits': 0,
+        'target': None,
+        },
     }
 
-def main(args):
-    if len(args) < 2:
-        usage(args)
-        sys.exit(1)
+def config_dict(config):
+    ret = {}
+    for section in config.sections():
+        print('Section: %s' % section)
+        ret[section] = {}
+        for option, value in config.items(section):
+            print('  Option: %s' % option)
+            ret[section][option] = value
+    return ret
 
-    config = ConfigParser.SafeConfigParser(defaults=DEFAULT_CONFIG)
-    add_defaults(config)
-    config.read(os.path.expanduser('~/.alias-manager.conf'))
-    # db = MySQLdb.connect(host = config.get('database', 'host'),
-    #                      user = config.get('database', 'user'),
-    #                      passwd = config.get('database', 'password'),
-    #                      db = config.get('database', 'database'))
-    db = psycopg2.connect('dbname=mail_aliases')
+def init_config(config):
+    for section in DEFAULT_CONFIG.keys():
+        if not config.has_section(section):
+            config.add_section(section)
+
+def main():
+    # #config = SafeConfigParser(defaults=DEFAULT_CONFIG)
+    # config = SafeConfigParser()
+    # config.read(['alias-manager.conf',
+    #              os.path.expanduser('~/.alias-manager.conf')])
+    # pprint(config.defaults())
+    # pprint(config_dict(config))
     
-    op = args[1]
-    if op == 'list':
-        list_aliases(db, config, args[2:])
-    elif op == 'add':
-        add_alias(db, config, args[2:])
-    elif op == 'remove':
-        remove_alias(db, config, args[2:])
-    elif op == 'disable':
-        disable_alias(db, config, args[2:])
-    elif op == 'enable':
-        enable_alias(db, config, args[2:])
+    parser = ArgumentParser()
+    subparsers = parser.add_subparsers(title='subcommands',
+                                       dest='command')
+
+    parser_list = subparsers.add_parser('list', help='list aliases')
+    parser_list.add_argument('alias', metavar='ALIAS', nargs='?',
+                             help='Alias (or substring) to search for')
+    
+    parser_add = subparsers.add_parser('add', help='add an alias')
+    parser_add.add_argument('-d', '--digits', metavar='DIGITS', type=int, default=0,
+                            help='number of digits to add')
+    parser_add.add_argument('alias', metavar='ALIAS', help='alias to add')
+    parser_add.add_argument('target', metavar='TARGET', nargs='?',
+                            help='target of alias')
+    
+    parser_remove = subparsers.add_parser('remove', help='remove an alias')
+    parser_remove.add_argument('alias', metavar='ALIAS', help='alias to remove')
+    
+    parser_enable = subparsers.add_parser('enable', help='enable an alias')
+    parser_enable.add_argument('alias', metavar='ALIAS', help='alias to enable')
+    
+    parser_disable = subparsers.add_parser('disable', help='disable an alias')
+    parser_disable.add_argument('alias', metavar='ALIAS', help='alias to disable')
+    
+    args = parser.parse_args()
+
+    session = init_db('sqlite:///aliases.sqlite')
+
+    if args.command == 'list':
+        list_aliases(session, args)
+    elif args.command == 'add':
+        add_alias(session, args)
+    elif args.command in ('remove', 'rm', 'delete'):
+        remove_alias(session, args)
+    elif args.command == 'enable':
+        enable_alias(session, args, True)
+    elif args.command == 'disable':
+        enable_alias(session, args, False)
     else:
-        usage()
+        print('Unknown command: {}'.format(args.command))
         
-def usage():
-    pass
-    
-def list_aliases(db, config, args):
-    if len(args) > 0:
-        substr = '%' + args[0] + '%'
+def list_aliases(session, args):
+    if args.alias:
+        search = '%{0}%'.format(args.alias)
     else:
-        substr = '%'
-    sql = "SELECT alias, destination, enabled FROM aliases WHERE alias LIKE %s ORDER BY alias"
-    cursor = db.cursor()
-    cursor.execute(sql, (substr,))
-    result = cursor.fetchall()
-    max_alias_len = 0
-    max_dest_len = 0
-    for row in result:
-        max_alias_len = max(max_alias_len, len(row[0]))
-        max_dest_len = max(max_dest_len, len(row[1]))
-    for row in result:
-        if row[2] == 1:
+        search = '%'
+    aliases = session.query(Alias).filter(Alias.alias.like(search)).order_by(Alias.alias).all()
+
+    max_len = reduce(max, [len(alias.alias) for alias in aliases], 0)
+
+    for alias in aliases:
+        if alias.enabled:
             disabled = ''
         else:
             disabled = ' (disabled)'
-        print(('{alias:'+str(max_alias_len)+'} -> {dest}{disabled}').format(alias = row[0], dest = row[1], disabled = disabled))
+        print('{0.alias:{1}} -> {0.destination}{2}'.format(alias, max_len, disabled))
     
-def add_alias(db, config, args):
-    if len(args) == 0:
-        return
-    if config.getboolean('add', 'add-number'):
-        digits = config.getint('add', 'num-digits')
-        name = ("{base}-{number:0" + str(digits) + "}").format(base = args[0], number = gen_random(digits))
+def add_alias(session, args):
+    if args.digits > 0:
+        alias_str = '{0}-{1:0{2}}'.format(args.alias, gen_random(args.digits),
+                                          args.digits)
     else:
-        name = args[0]
-    dest = config.get('add', 'destination')
-    sql = 'INSERT INTO aliases (alias, destination, enabled) VALUES (%s, %s, %s)'
-    cursor = db.cursor()
-    cursor.execute(sql, (name, dest, True))
-    db.commit()
-    print('Added alias ' + name)
+        alias_str = args.alias
+    alias = Alias(alias_str, 'asdf')
+    session.add(alias)
+    session.commit()
+    print('Added alias {}'.format(alias_str))
 
-def remove_alias(db, config, args):
-    sql = 'DELETE FROM aliases WHERE alias = %s'
-    cursor = db.cursor()
-    cursor.execute(sql, (args[0],))
-    db.commit()
-    print('Deleted alias ' + args[0])
+def remove_alias(session, args):
+    query = session.query(Alias).filter(Alias.alias==args.alias)
 
-def disable_alias(db, config, args):
-    sql = 'UPDATE aliases SET enabled = 0 WHERE alias = %s'
-    cursor = db.cursor()
-    cursor.execute(sql, (args[0],))
-    db.commit()
-    print('Disabled alias ' + args[0])
+    if not query.first():
+        raise NoSuchAlias(args.alias)
+    
+    query.delete()
+    session.commit()
+    print('Deleted alias {}'.format(args.alias))
 
-def enable_alias(db, config, args):
-    sql = 'UPDATE aliases SET enabled = 1 WHERE alias = %s'
-    cursor = db.cursor()
-    cursor.execute(sql, (args[0],))
-    db.commit()
-    print('Enabled alias ' + args[0])
-
-def add_defaults(config):
-    if not config.has_section('add'):
-        config.add_section('add')
-    config.set('add', 'add-number', 'no')
+def enable_alias(session, args, enabled):
+    if enabled:
+        op = 'Enabled'
+    else:
+        op = 'Disabled'
+    alias = session.query(Alias).filter(Alias.alias==args.alias).first()
+    if not alias:
+        raise NoSuchAlias(args.alias)
+    alias.enabled = enabled
+    session.commit()
+    print('{} alias {}'.format(op, alias.alias))
 
 def gen_random(digits):
     return random.randrange(10 ** digits)
 
+class NoSuchAlias(SystemExit):
+    def __init__(self, alias):
+        super().__init__('No such alias: {}'.format(alias))
+
 if __name__ == "__main__":
-    main(sys.argv)
+    main()
