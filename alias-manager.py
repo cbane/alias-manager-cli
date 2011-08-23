@@ -55,6 +55,7 @@ def main():
     parser_list = subparsers.add_parser('list', help='list aliases')
     parser_list.add_argument('alias', metavar='ALIAS', nargs='?',
                              help='Alias (or substring) to search for')
+    parser_list.set_defaults(func=list_cmd)
     
     parser_add = subparsers.add_parser('add', help='add an alias')
     parser_add.add_argument('-d', '--digits', metavar='DIGITS', type=int, default=0,
@@ -62,34 +63,25 @@ def main():
     parser_add.add_argument('alias', metavar='ALIAS', help='alias to add')
     parser_add.add_argument('target', metavar='TARGET', nargs='?',
                             help='target of alias')
+    parser_add.set_defaults(func=add_cmd)
     
     parser_remove = subparsers.add_parser('remove', help='remove an alias')
     parser_remove.add_argument('alias', metavar='ALIAS', help='alias to remove')
+    parser_remove.set_defaults(func=remove_cmd)
     
     parser_enable = subparsers.add_parser('enable', help='enable an alias')
     parser_enable.add_argument('alias', metavar='ALIAS', help='alias to enable')
+    parser_enable.set_defaults(func=enable_cmd, enabled=True)
     
     parser_disable = subparsers.add_parser('disable', help='disable an alias')
     parser_disable.add_argument('alias', metavar='ALIAS', help='alias to disable')
+    parser_disable.set_defaults(func=enable_cmd, enabled=False)
     
     args = parser.parse_args()
-
     session = init_db('sqlite:///aliases.sqlite')
-
-    if args.command == 'list':
-        list_aliases(session, args)
-    elif args.command == 'add':
-        add_alias(session, args)
-    elif args.command in ('remove', 'rm', 'delete'):
-        remove_alias(session, args)
-    elif args.command == 'enable':
-        enable_alias(session, args, True)
-    elif args.command == 'disable':
-        enable_alias(session, args, False)
-    else:
-        print('Unknown command: {}'.format(args.command))
+    args.func(session, args)
         
-def list_aliases(session, args):
+def list_cmd(session, args):
     if args.alias:
         search = '%{0}%'.format(args.alias)
     else:
@@ -105,7 +97,7 @@ def list_aliases(session, args):
             disabled = ' (disabled)'
         print('{0.alias:{1}} -> {0.destination}{2}'.format(alias, max_len, disabled))
     
-def add_alias(session, args):
+def add_cmd(session, args):
     if args.digits > 0:
         alias_str = '{0}-{1:0{2}}'.format(args.alias, gen_random(args.digits),
                                           args.digits)
@@ -116,7 +108,7 @@ def add_alias(session, args):
     session.commit()
     print('Added alias {}'.format(alias_str))
 
-def remove_alias(session, args):
+def remove_cmd(session, args):
     query = session.query(Alias).filter(Alias.alias==args.alias)
 
     if not query.first():
@@ -126,8 +118,8 @@ def remove_alias(session, args):
     session.commit()
     print('Deleted alias {}'.format(args.alias))
 
-def enable_alias(session, args, enabled):
-    if enabled:
+def enable_cmd(session, args):
+    if args.enabled:
         op = 'Enabled'
     else:
         op = 'Disabled'
