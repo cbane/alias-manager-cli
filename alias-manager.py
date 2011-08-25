@@ -3,6 +3,8 @@
 from __future__ import print_function
 
 from ConfigParser import SafeConfigParser
+from configobj import ConfigObj
+from validate import Validator
 from argparse import ArgumentParser
 import random
 import os.path
@@ -11,42 +13,28 @@ from pprint import pprint
 
 from aliasmanager import *
 
-DEFAULT_CONFIG = {
+CONFIGSPEC = {
     'database': {
-        'host': None,
-        'dbname': None,
-        'table': None,
-        'user': None,
-        'password': None
+        'driver': 'string',
+        'host': 'string(default=None)',
+        'port': 'integer(default=None)',
+        'dbname': 'string',
+        'table': 'string(default=None)',
+        'user': 'string(default=None)',
+        'password': 'string(default=None)',
         },
     'add': {
-        'digits': 0,
-        'target': None,
-        },
+        'digits': 'integer(min=0, default=0)',
+        'target': 'string(default=None)',
+        }
     }
 
-def config_dict(config):
-    ret = {}
-    for section in config.sections():
-        print('Section: %s' % section)
-        ret[section] = {}
-        for option, value in config.items(section):
-            print('  Option: %s' % option)
-            ret[section][option] = value
-    return ret
-
-def init_config(config):
-    for section in DEFAULT_CONFIG.keys():
-        if not config.has_section(section):
-            config.add_section(section)
-
 def main():
-    # #config = SafeConfigParser(defaults=DEFAULT_CONFIG)
-    # config = SafeConfigParser()
-    # config.read(['alias-manager.conf',
-    #              os.path.expanduser('~/.alias-manager.conf')])
-    # pprint(config.defaults())
-    # pprint(config_dict(config))
+    config = ConfigObj('alias-manager.conf', configspec=CONFIGSPEC)
+    val = Validator()
+    result = config.validate(val)
+    if result != True:
+        raise SystemExit('Error loading config file')
     
     parser = ArgumentParser()
     subparsers = parser.add_subparsers(title='subcommands',
@@ -58,10 +46,12 @@ def main():
     parser_list.set_defaults(func=list_cmd)
     
     parser_add = subparsers.add_parser('add', help='add an alias')
-    parser_add.add_argument('-d', '--digits', metavar='DIGITS', type=int, default=0,
+    parser_add.add_argument('-d', '--digits', metavar='DIGITS', type=int,
+                            default=config['add']['digits'],
                             help='number of digits to add')
     parser_add.add_argument('alias', metavar='ALIAS', help='alias to add')
     parser_add.add_argument('target', metavar='TARGET', nargs='?',
+                            default=config['add']['target'],
                             help='target of alias')
     parser_add.set_defaults(func=add_cmd)
     
@@ -78,7 +68,7 @@ def main():
     parser_disable.set_defaults(func=enable_cmd, enabled=False)
     
     args = parser.parse_args()
-    session = init_db('sqlite:///aliases.sqlite')
+    session = init_db(config=config['database'], echo=True)
     args.func(session, args)
         
 def list_cmd(session, args):
