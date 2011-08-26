@@ -19,10 +19,27 @@ def init_db(config, echo=False):
               host=config['host'],
               port=config['port'],
               database=config['dbname'])
+    if 'table' in config and config['table']:
+        change_table_name(Base.metadata, Alias, config['table'])
     engine = create_engine(url, echo=echo)
     Base.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
     return session
+
+def change_table_name(metadata, cls, name):
+    old_name = cls.__table__.name
+    schema = cls.__table__.schema
+
+    if name == old_name:
+        return
+
+    cls.__table__.name = name
+    if schema:
+        cls.__table__.fullname = '%s.%s' % (schema, name)
+    else:
+        cls.__table__.fullname = name
+    metadata._remove_table(old_name, schema)
+    metadata._add_table(name, schema, cls.__table__)
 
 class Alias(Base):
     __tablename__ = 'aliases'
