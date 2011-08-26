@@ -97,7 +97,7 @@ def add_cmd(session, args):
                                           args.digits)
     else:
         alias_str = args.alias
-    alias = Alias(alias_str, 'asdf')
+    alias = Alias(alias_str, args.target)
     session.add(alias)
     session.commit()
     print('Added alias {0}'.format(alias_str))
