@@ -50,7 +50,11 @@ def main():
                             default=config['add']['digits'],
                             help='number of digits to add')
     parser_add.add_argument('alias', metavar='ALIAS', help='alias to add')
-    parser_add.add_argument('target', metavar='TARGET', nargs='?',
+    if config['add']['target']:
+        target_nargs = '?'
+    else:
+        target_nargs = None
+    parser_add.add_argument('target', metavar='TARGET', nargs=target_nargs,
                             default=config['add']['target'],
                             help='target of alias')
     parser_add.set_defaults(func=add_cmd)
