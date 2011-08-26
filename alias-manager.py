@@ -100,7 +100,7 @@ def add_cmd(session, args):
     alias = Alias(alias_str, 'asdf')
     session.add(alias)
     session.commit()
-    print('Added alias {}'.format(alias_str))
+    print('Added alias {0}'.format(alias_str))
 
 def remove_cmd(session, args):
     query = session.query(Alias).filter(Alias.alias==args.alias)
@@ -110,7 +110,7 @@ def remove_cmd(session, args):
     
     query.delete()
     session.commit()
-    print('Deleted alias {}'.format(args.alias))
+    print('Deleted alias {0}'.format(args.alias))
 
 def enable_cmd(session, args):
     if args.enabled:
@@ -122,14 +122,14 @@ def enable_cmd(session, args):
         raise NoSuchAlias(args.alias)
     alias.enabled = enabled
     session.commit()
-    print('{} alias {}'.format(op, alias.alias))
+    print('{0} alias {1}'.format(op, alias.alias))
 
 def gen_random(digits):
     return random.randrange(10 ** digits)
 
 class NoSuchAlias(SystemExit):
     def __init__(self, alias):
-        super().__init__('No such alias: {}'.format(alias))
+        super().__init__('No such alias: {0}'.format(alias))
 
 if __name__ == "__main__":
     main()
