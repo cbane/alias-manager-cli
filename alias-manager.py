@@ -72,7 +72,7 @@ def main():
     parser_disable.set_defaults(func=enable_cmd, enabled=False)
     
     args = parser.parse_args()
-    session = init_db(config=config['database'], echo=True)
+    session = init_db(config=config['database'])
     args.func(session, args)
         
 def list_cmd(session, args):
