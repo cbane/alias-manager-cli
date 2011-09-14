@@ -47,7 +47,8 @@ class Alias(Base):
         return "<Alias('%s','%s',%s)>" % (self.alias, self.destination, self.enabled)
 
 def main():
-    config = ConfigObj('alias-manager.conf', configspec=CONFIGSPEC)
+    config = ConfigObj(os.path.expanduser('~/.alias-manager.conf'),
+                       configspec=CONFIGSPEC)
     val = Validator()
     result = config.validate(val)
     if result != True:
