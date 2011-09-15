@@ -2,7 +2,6 @@
 
 from __future__ import print_function
 
-from ConfigParser import SafeConfigParser
 from configobj import ConfigObj
 from validate import Validator
 from argparse import ArgumentParser
