@@ -179,7 +179,7 @@ def gen_random(digits):
 
 class NoSuchAlias(SystemExit):
     def __init__(self, alias):
-        super().__init__('No such alias: {0}'.format(alias))
+        super(NoSuchAlias, self).__init__('No such alias: {0}'.format(alias))
 
 if __name__ == "__main__":
     main()
