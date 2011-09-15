@@ -7,6 +7,7 @@ from configobj import ConfigObj
 from validate import Validator
 from argparse import ArgumentParser
 import sqlalchemy as sa
+import sqlalchemy.exc
 from sqlalchemy.ext.declarative import declarative_base
 import random
 import os.path
@@ -149,7 +150,10 @@ def add_cmd(session, args):
         alias_str = args.alias
     alias = Alias(alias_str, args.target)
     session.add(alias)
-    session.commit()
+    try:
+        session.commit()
+    except sqlalchemy.exc.IntegrityError:
+        raise DuplicateAlias(alias_str)
     print('Added alias {0}'.format(alias_str))
 
 def remove_cmd(session, args):
@@ -180,6 +184,10 @@ def gen_random(digits):
 class NoSuchAlias(SystemExit):
     def __init__(self, alias):
         super(NoSuchAlias, self).__init__('No such alias: {0}'.format(alias))
+
+class DuplicateAlias(SystemExit):
+    def __init__(self, alias):
+        super(DuplicateAlias, self).__init__('Alias already exists: {0}'.format(alias))
 
 if __name__ == "__main__":
     main()
