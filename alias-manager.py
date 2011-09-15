@@ -11,8 +11,6 @@ from sqlalchemy.ext.declarative import declarative_base
 import random
 import os.path
 
-from pprint import pprint
-
 CONFIGSPEC = {
     'database': {
         'driver': 'string',
