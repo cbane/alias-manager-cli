@@ -170,7 +170,7 @@ def enable_cmd(session, args):
     alias = session.query(Alias).filter(Alias.alias==args.alias).first()
     if not alias:
         raise NoSuchAlias(args.alias)
-    alias.enabled = enabled
+    alias.enabled = args.enabled
     session.commit()
     print('{0} alias {1}'.format(op, alias.alias))
 
