@@ -69,7 +69,7 @@ def main():
         raise SystemExit('Error loading config file')
     
     parser = ArgumentParser()
-    subparsers = parser.add_subparsers(title='subcommands',
+    subparsers = parser.add_subparsers(title='actions',
                                        dest='command')
 
     parser_list = subparsers.add_parser('list', help='list aliases')
