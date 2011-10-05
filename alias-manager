@@ -18,12 +18,14 @@
 
 from __future__ import print_function
 
+import sys
 from configobj import ConfigObj
 from validate import Validator
-from argparse import ArgumentParser
+import argparse
 import sqlalchemy as sa
 import sqlalchemy.exc
 from sqlalchemy.ext.declarative import declarative_base
+import csv
 import random
 import os.path
 
@@ -71,7 +73,7 @@ def main():
     if result != True:
         raise SystemExit('Error loading config file')
     
-    parser = ArgumentParser(description=DESCRIPTION)
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('-v', '--version', action='version', version=VERSION)
 
     subparsers = parser.add_subparsers(title='actions',
@@ -107,7 +109,21 @@ def main():
     parser_disable = subparsers.add_parser('disable', help='disable an alias')
     parser_disable.add_argument('alias', metavar='ALIAS', help='alias to disable')
     parser_disable.set_defaults(func=enable_cmd, enabled=False)
+
+    parser_import = subparsers.add_parser('import', help='import alias list')
+    parser_import.add_argument('-f', '--force', action='store_true',
+                               help='overwrite existing aliases')
+    parser_import.add_argument('file', metavar='FILE', nargs='?',
+                               type=argparse.FileType('r'), default=sys.stdin,
+                               help='file to import from (default: STDIN)')
+    parser_import.set_defaults(func=import_cmd)
     
+    parser_export = subparsers.add_parser('export', help='export alias list')
+    parser_export.add_argument('file', metavar='FILE', nargs='?',
+                               type=argparse.FileType('w'), default=sys.stdout,
+                               help='file to export to (default: STDOUT)')
+    parser_export.set_defaults(func=export_cmd)
+
     args = parser.parse_args()
     session = init_db(config=config['database'])
     args.func(session, args)
@@ -195,6 +211,29 @@ def enable_cmd(session, args):
     alias.enabled = args.enabled
     session.commit()
     print('{0} alias {1}'.format(op, alias.alias))
+
+def import_cmd(session, args):
+    csvfile = csv.DictReader(args.file, ('alias', 'destination', 'enabled'))
+    for entry in csvfile:
+        entry['enabled'] = bool(entry['enabled'])
+        alias = session.query(Alias).filter(Alias.alias==entry['alias']).first()
+        if not alias:
+            alias = Alias(**entry)
+            session.add(alias)
+            print("Imported alias '{0.alias}'".format(alias))
+        elif args.force:
+            alias.destination = entry['destination']
+            alias.enabled = entry['enabled']
+            print("Updated alias '{0.alias}'".format(alias))
+        else:
+            print("Skipped existing alias '{0[alias]}'".format(entry))
+    session.commit()
+
+def export_cmd(session, args):
+    csvfile = csv.writer(args.file)
+    aliases = session.query(Alias).order_by(Alias.alias).all()
+    for alias in aliases:
+        csvfile.writerow((alias.alias, alias.destination, alias.enabled))
 
 def gen_random(digits):
     return random.randrange(10 ** digits)
