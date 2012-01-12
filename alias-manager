@@ -28,6 +28,7 @@ from sqlalchemy.ext.declarative import declarative_base
 import csv
 import random
 import os.path
+import re
 
 DESCRIPTION = 'Manages a database-backed list of email aliases'
 VERSION = 'Alias Manager v1'
@@ -177,6 +178,11 @@ def list_cmd(session, args):
         print('{0.alias:{1}} -> {0.destination}{2}'.format(alias, max_len, disabled))
     
 def add_cmd(session, args):
+    atom = r'[a-z0-9!#$%&\'*+/=?^_`{}|~-]+'
+    dot_atom = r'^' + atom + r'(\.' + atom + r')*$'
+    if not re.match(dot_atom, args.alias, re.I):
+        raise InvalidAlias(args.alias)
+
     if args.digits > 0:
         alias_str = '{0}-{1:0{2}}'.format(args.alias, gen_random(args.digits),
                                           args.digits)
@@ -245,6 +251,10 @@ class NoSuchAlias(SystemExit):
 class DuplicateAlias(SystemExit):
     def __init__(self, alias):
         super(DuplicateAlias, self).__init__('Alias already exists: {0}'.format(alias))
+
+class InvalidAlias(SystemExit):
+    def __init__(self, alias):
+        super(InvalidAlias, self).__init__('Invalid alias: {0}'.format(alias))
 
 if __name__ == "__main__":
     main()
