@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # Manages a database-backed list of email aliases.
-# Copyright (C) 2010, 2011  Courtney Bane
+# Copyright (C) 2010, 2011, 2013  Courtney Bane
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -81,6 +81,12 @@ def main():
                                        dest='command')
 
     parser_list = subparsers.add_parser('list', help='list aliases')
+    parser_list.add_argument('--alias-only', action='store_true',
+                             help='Only print aliases (no destinations)')
+    parser_list.add_argument('--enabled', action='store_false', dest='filter', default=None,
+                             help='Only print enabled aliases')
+    parser_list.add_argument('--disabled', action='store_true', dest='filter',
+                             help='Only print disabled aliases')
     parser_list.add_argument('alias', metavar='ALIAS', nargs='?',
                              help='Alias (or substring) to search for')
     parser_list.set_defaults(func=list_cmd)
@@ -175,7 +181,12 @@ def list_cmd(session, args):
             disabled = ''
         else:
             disabled = ' (disabled)'
-        print('{0.alias:{1}} -> {0.destination}{2}'.format(alias, max_len, disabled))
+        if args.filter == alias.enabled:
+            continue
+        if args.alias_only:
+            print(alias.alias)
+        else:
+            print('{0.alias:{1}} -> {0.destination}{2}'.format(alias, max_len, disabled))
     
 def add_cmd(session, args):
     atom = r'[a-z0-9!#$%&\'*+/=?^_`{}|~-]+'
